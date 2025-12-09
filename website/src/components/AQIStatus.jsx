@@ -3,16 +3,16 @@ import './AQIStatus.css';
 import rouletteSound from '../assets/item-roulette.mp3';
 
 const PREDEFINED_COLORS = [
-  '#00CED1', // Cyan
-  '#00E400', // Green
-  '#4A90E2', // Blue
-  '#9B59B6', // Purple
-  '#E74C3C', // Red
-  '#F39C12', // Orange
-  '#1ABC9C', // Turquoise
-  '#E91E63', // Pink
-  '#00BCD4', // Light Blue
-  '#8E44AD'  // Dark Purple
+  '#00FFFF', // Bright Cyan
+  '#00FF00', // Bright Green
+  '#0000FF', // Pure Blue
+  '#8B00FF', // Violet
+  '#FF0000', // Pure Red
+  '#FF8C00', // Dark Orange
+  '#FFD700', // Gold
+  '#FF00FF', // Magenta
+  '#00FF7F', // Spring Green
+  '#4B0082'  // Indigo
 ];
 
 const getStatusColor = (status) => {

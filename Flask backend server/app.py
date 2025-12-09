@@ -191,38 +191,77 @@ def load_model_files():
     global model, scaler, deployment_params, feature_columns, label_encoder_target
     
     try:
-        # Get the base directory (parent of Flask backend server)
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        model_dir = os.path.join(base_dir, 'Model')
+        # Check if running in Docker (model files mounted at /app/model)
+        # Otherwise use relative path for local development
+        docker_path = '/app/model'
+        if os.path.exists(docker_path):
+            model_dir = docker_path
+            print(f"✓ Running in Docker, using model directory: {model_dir}")
+        else:
+            # Get the base directory (parent of Flask backend server)
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            model_dir = os.path.join(base_dir, 'Model')
+            print(f"✓ Running locally, using model directory: {model_dir}")
+        
+        # Verify model directory exists
+        if not os.path.exists(model_dir):
+            raise FileNotFoundError(f"Model directory not found: {model_dir}")
+        
+        # List files in model directory for debugging
+        try:
+            files = os.listdir(model_dir)
+            print(f"✓ Files in model directory ({len(files)} files): {files}")
+            # Check for required files
+            required_files = ['best_model.joblib', 'scaler.joblib', 'deployment_params.joblib', 
+                            'feature_columns.joblib', 'label_encoder_target.joblib']
+            missing_files = [f for f in required_files if f not in files]
+            if missing_files:
+                raise FileNotFoundError(f"Missing required model files: {missing_files}")
+            print(f"✓ All required model files found")
+        except PermissionError as e:
+            raise PermissionError(f"Cannot access model directory {model_dir}: {e}")
         
         # Load model
         model_path = os.path.join(model_dir, 'best_model.joblib')
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
         model = joblib.load(model_path)
         print(f"✓ Loaded model from {model_path}")
         
         # Load scaler
         scaler_path = os.path.join(model_dir, 'scaler.joblib')
+        if not os.path.exists(scaler_path):
+            raise FileNotFoundError(f"Scaler file not found: {scaler_path}")
         scaler = joblib.load(scaler_path)
         print(f"✓ Loaded scaler from {scaler_path}")
         
         # Load deployment params
         params_path = os.path.join(model_dir, 'deployment_params.joblib')
+        if not os.path.exists(params_path):
+            raise FileNotFoundError(f"Deployment params file not found: {params_path}")
         deployment_params = joblib.load(params_path)
         print(f"✓ Loaded deployment params from {params_path}")
         
         # Load feature columns
         feature_path = os.path.join(model_dir, 'feature_columns.joblib')
+        if not os.path.exists(feature_path):
+            raise FileNotFoundError(f"Feature columns file not found: {feature_path}")
         feature_columns = joblib.load(feature_path)
         print(f"✓ Loaded feature columns from {feature_path}")
         
         # Load label encoder
         encoder_path = os.path.join(model_dir, 'label_encoder_target.joblib')
+        if not os.path.exists(encoder_path):
+            raise FileNotFoundError(f"Label encoder file not found: {encoder_path}")
         label_encoder_target = joblib.load(encoder_path)
         print(f"✓ Loaded label encoder from {encoder_path}")
         
+        print("✓ All model files loaded successfully!")
         return True
     except Exception as e:
-        print(f"Error loading model files: {str(e)}")
+        import traceback
+        print(f"✗ Error loading model files: {str(e)}")
+        print(f"✗ Traceback: {traceback.format_exc()}")
         return False
 
 def predict_status(aqi_value):
@@ -431,11 +470,33 @@ if __name__ == '__main__':
     print("Starting AQI Prediction Flask Server")
     print("=" * 60)
     
+    # Verify model directory accessibility
+    docker_model_path = '/app/model'
+    if os.path.exists(docker_model_path):
+        print(f"✓ Docker model path exists: {docker_model_path}")
+        try:
+            files = os.listdir(docker_model_path)
+            print(f"✓ Files in Docker model directory: {files}")
+        except Exception as e:
+            print(f"✗ Cannot list files in {docker_model_path}: {e}")
+    else:
+        print(f"✗ Docker model path does not exist: {docker_model_path}")
+        # Check local path
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        local_model_dir = os.path.join(base_dir, 'Model')
+        print(f"Checking local model directory: {local_model_dir}")
+        if os.path.exists(local_model_dir):
+            print(f"✓ Local model directory exists: {local_model_dir}")
+    
     # Load model files
     if load_model_files():
         print("✓ All model files loaded successfully")
     else:
         print("✗ Failed to load model files. Server will start but predictions will fail.")
+        print("✗ Please check:")
+        print("  1. Model directory is mounted correctly in docker-compose.yml")
+        print("  2. All required .joblib files exist in the Model directory")
+        print("  3. File permissions are correct")
     
     # Start MQTT client
     start_mqtt_client()

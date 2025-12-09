@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  flask-backend:
+    build:
+      context: ./Flask backend server
+      dockerfile: Dockerfile
+    container_name: aqi-flask-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount Model directory so Flask can access model files
+      - ./Model:/app/model:ro
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - aqi-network
+
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:5000
+    container_name: aqi-website
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code for hot reload
+      - ./website/src:/app/src
+      - ./website/public:/app/public
+      - ./website/index.html:/app/index.html
+      # Exclude node_modules from volume mount
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    depends_on:
+      - flask-backend
+    restart: unless-stopped
+    networks:
+      - aqi-network
+
+networks:
+  aqi-network:
+    driver: bridge
+
