@@ -1,5 +1,7 @@
-// Use environment variable or default to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Use proxy in Docker, or direct URL for local development
+// In Docker, Vite proxies /api/* to flask-backend:5000
+// For local dev or remote server, use full URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 /**
  * Fetch latest prediction from MQTT
