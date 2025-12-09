@@ -6,6 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0', // Allow external connections
+    allowedHosts: [
+      'kelompoknullvoid.xetf.my.id',
+      'localhost',
+      '.xetf.my.id', // Allow all subdomains
+    ],
     proxy: {
       '/api': {
         // In Docker, Vite can use the service name 'flask-backend'
