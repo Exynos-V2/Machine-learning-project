@@ -1,0 +1,17 @@
+# Docker Compose override for server environments
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.server.yml up
+
+version: '3.8'
+
+services:
+  website:
+    environment:
+      # On server, if proxy doesn't work, use direct connection to Flask
+      # Uncomment and set to your Flask server URL if needed:
+      # - VITE_API_URL=http://localhost:5000
+      # Or if Flask is on different host:
+      # - VITE_API_URL=http://37.44.244.209:5000
+      
+      # Proxy target - try localhost if service name doesn't resolve
+      - PROXY_TARGET=http://localhost:5000
+

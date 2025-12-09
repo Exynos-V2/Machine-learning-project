@@ -43,9 +43,11 @@ services:
       - /app/node_modules
     environment:
       # API URL for frontend (uses proxy /api)
-      - VITE_API_URL=/api
+      # Can be overridden to full URL if proxy doesn't work on server
+      - VITE_API_URL=${VITE_API_URL:-/api}
       # Proxy target for Vite (uses Docker service name)
-      - PROXY_TARGET=http://flask-backend:5000
+      # Can be overridden: PROXY_TARGET=http://localhost:5000 for server
+      - PROXY_TARGET=${PROXY_TARGET:-http://flask-backend:5000}
     depends_on:
       - flask-backend
     restart: unless-stopped

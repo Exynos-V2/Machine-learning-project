@@ -1,7 +1,25 @@
 // Use proxy in Docker, or direct URL for local development
 // In Docker, Vite proxies /api/* to flask-backend:5000
 // For local dev or remote server, use full URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+// Fallback: try proxy first, then direct URL if proxy fails
+let API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+// If VITE_API_URL is set to a full URL (not /api), use it directly
+// This allows overriding for server environments where proxy might not work
+if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.startsWith('http')) {
+  API_BASE_URL = import.meta.env.VITE_API_URL;
+} else if (import.meta.env.VITE_API_URL === '/api') {
+  // Use proxy
+  API_BASE_URL = '/api';
+} else {
+  // Default: try proxy, but allow fallback
+  API_BASE_URL = '/api';
+}
+
+// Export for debugging
+if (import.meta.env.DEV) {
+  console.log('API Base URL:', API_BASE_URL);
+}
 
 /**
  * Fetch latest prediction from MQTT
