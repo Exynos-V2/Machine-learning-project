@@ -10,6 +10,16 @@ export const AQIChart = ({ history }) => {
     );
   }
 
+  // Helper function to get AQI category from AQI value
+  const getAQICategory = (aqi) => {
+    if (aqi <= 50) return 'Good';
+    if (aqi <= 100) return 'Moderate';
+    if (aqi <= 150) return 'Unhealthy_for_Sensitive';
+    if (aqi <= 200) return 'Unhealthy';
+    if (aqi <= 300) return 'Very_Unhealthy';
+    return 'Hazardous';
+  };
+
   // Prepare data for chart - reverse to show chronological order
   const chartData = history
     .slice()
@@ -17,7 +27,7 @@ export const AQIChart = ({ history }) => {
     .map((item, index) => ({
       time: new Date(item.timestamp).toLocaleTimeString(),
       aqi: Math.round(item.aqi),
-      status: item.predicted_status,
+      status: item.predicted_status || getAQICategory(item.aqi), // Use predicted_status if available, otherwise calculate from AQI
       index: index
     }));
 
@@ -45,9 +55,10 @@ export const AQIChart = ({ history }) => {
   };
 
   // Prepare data for status distribution pie chart
+  // Use predicted_status if available, otherwise calculate from AQI value
   const statusCounts = {};
   history.forEach(item => {
-    const status = item.predicted_status;
+    const status = item.predicted_status || getAQICategory(item.aqi);
     statusCounts[status] = (statusCounts[status] || 0) + 1;
   });
 
@@ -122,7 +133,7 @@ export const AQIChart = ({ history }) => {
 
   return (
     <div className="aqi-chart-container">
-      <h2 className="chart-title">AQI History</h2>
+      <h2 className="chart-title">AQI History (Real-time)</h2>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
@@ -156,7 +167,7 @@ export const AQIChart = ({ history }) => {
         <div className="pie-chart-card">
           <div className="pie-chart-header">
             <h3 className="pie-chart-title">Status Distribution</h3>
-            <p className="pie-chart-description">Based on predicted status from history</p>
+            <p className="pie-chart-description">Based on AQI category from real-time readings</p>
           </div>
           <div className="pie-chart-content">
             {statusData.length > 0 ? (
@@ -190,7 +201,7 @@ export const AQIChart = ({ history }) => {
           </div>
           <div className="pie-chart-footer">
             <div className="pie-chart-footer-text">
-              Showing distribution of {history.length} predictions
+              Showing distribution of {history.length} readings
             </div>
           </div>
         </div>
@@ -198,7 +209,7 @@ export const AQIChart = ({ history }) => {
         <div className="pie-chart-card">
           <div className="pie-chart-header">
             <h3 className="pie-chart-title">AQI Category Distribution</h3>
-            <p className="pie-chart-description">Based on AQI value ranges</p>
+            <p className="pie-chart-description">Based on real-time AQI value ranges</p>
           </div>
           <div className="pie-chart-content">
             {categoryData.length > 0 ? (

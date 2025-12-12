@@ -57,6 +57,22 @@ export const getPredictionHistory = async (limit = 20) => {
 };
 
 /**
+ * Fetch real-time AQI history
+ */
+export const getAQIHistory = async (limit = 100) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/aqi-history?limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching AQI history:', error);
+    throw error;
+  }
+};
+
+/**
  * Make a manual prediction
  */
 export const makePrediction = async (aqiValue) => {

@@ -53,6 +53,13 @@
 .category-info {
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.category-info-secondary {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
 }
 
 .probabilities {
@@ -107,13 +114,52 @@
   font-weight: 500;
 }
 
+.timestamp-info {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .timestamp {
   text-align: center;
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.85rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.5rem;
+}
+
+.timestamp:last-child {
+  margin-bottom: 0;
+}
+
+.prediction-timestamp {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.prediction-interval-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+.waiting-prediction {
+  color: rgba(255, 200, 0, 0.9);
+  font-style: italic;
+  animation: pulse-opacity 2s ease-in-out infinite;
+}
+
+@keyframes pulse-opacity {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .color-picker-section {

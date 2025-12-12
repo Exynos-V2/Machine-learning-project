@@ -3,10 +3,10 @@ import './App.css'
 import Plasma from './Plasma'
 import AQIStatus from './components/AQIStatus'
 import AQIChart from './components/AQIChart'
-import { getLatestPrediction, getPredictionHistory } from './services/api'
+import { getLatestPrediction, getAQIHistory } from './services/api'
 
 function App() {
-  const [latestPrediction, setLatestPrediction] = useState(null)
+  const [latestData, setLatestData] = useState(null) // Contains both AQI and prediction
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -16,8 +16,8 @@ function App() {
   const fetchLatestData = useCallback(async () => {
     try {
       const latest = await getLatestPrediction()
-      if (latest) {
-        setLatestPrediction(latest)
+      if (latest && latest.aqi !== null && latest.aqi !== undefined) {
+        setLatestData(latest)
         setConnectionStatus('connected')
       } else {
         setConnectionStatus('waiting')
@@ -34,12 +34,12 @@ function App() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const historyData = await getPredictionHistory(20)
+      const historyData = await getAQIHistory(20)
       if (historyData && historyData.history) {
         setHistory(historyData.history)
       }
     } catch (err) {
-      console.error('Error fetching history:', err)
+      console.error('Error fetching AQI history:', err)
     }
   }, [])
 
@@ -96,7 +96,11 @@ function App() {
           </div>
         ) : (
           <div className="dashboard-grid">
-            <AQIStatus prediction={latestPrediction} onColorChange={setPlasmaColor} currentColor={plasmaColor} />
+            <AQIStatus 
+              latestData={latestData} 
+              onColorChange={setPlasmaColor} 
+              currentColor={plasmaColor} 
+            />
             <AQIChart history={history} />
           </div>
         )}

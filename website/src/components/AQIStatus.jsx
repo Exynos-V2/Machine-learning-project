@@ -40,7 +40,7 @@ const getAQICategory = (aqi) => {
   return 'Hazardous';
 };
 
-export const AQIStatus = ({ prediction, onColorChange, currentColor }) => {
+export const AQIStatus = ({ latestData, onColorChange, currentColor }) => {
   const [isRandomizing, setIsRandomizing] = useState(false);
   const [gamblingColor, setGamblingColor] = useState(null);
   const intervalRef = useRef(null);
@@ -164,7 +164,7 @@ export const AQIStatus = ({ prediction, onColorChange, currentColor }) => {
     </div>
   );
 
-  if (!prediction) {
+  if (!latestData || latestData.aqi === null || latestData.aqi === undefined) {
     return (
       <div className="aqi-status-container">
         <div className="aqi-status-loading">Waiting for data...</div>
@@ -173,36 +173,63 @@ export const AQIStatus = ({ prediction, onColorChange, currentColor }) => {
     );
   }
 
-  const { aqi, predicted_status, probabilities } = prediction;
-  const statusColor = getStatusColor(predicted_status);
-  const aqiCategory = getAQICategory(aqi);
+  // Extract real-time AQI and prediction data
+  const realTimeAQI = latestData.aqi;
+  const prediction = latestData.prediction;
+  const aqiTimestamp = latestData.aqi_timestamp;
+  const predictionInterval = latestData.prediction_interval_minutes || 15;
+
+  // Use prediction status if available, otherwise use AQI category
+  const statusColor = prediction 
+    ? getStatusColor(prediction.predicted_status)
+    : getStatusColor(getAQICategory(realTimeAQI));
+  const aqiCategory = getAQICategory(realTimeAQI);
 
   return (
     <div className="aqi-status-container">
       <div className="aqi-value-display">
         <div className="aqi-number" style={{ color: statusColor }}>
-          {Math.round(aqi)}
+          {Math.round(realTimeAQI)}
         </div>
-        <div className="aqi-label">AQI</div>
+        <div className="aqi-label">AQI (Real-time)</div>
       </div>
       
       <div className="status-info">
-        <div 
-          className="status-badge" 
-          style={{ backgroundColor: statusColor }}
-        >
-          {getStatusLabel(predicted_status)}
-        </div>
-        <div className="category-info">
-          Category: {getStatusLabel(aqiCategory)}
+        {prediction ? (
+          <>
+            <div 
+              className="status-badge" 
+              style={{ backgroundColor: statusColor }}
+            >
+              {getStatusLabel(prediction.predicted_status)}
+            </div>
+            <div className="category-info">
+              Predicted Status (Updated every {predictionInterval} min)
+            </div>
+          </>
+        ) : (
+          <>
+            <div 
+              className="status-badge" 
+              style={{ backgroundColor: statusColor }}
+            >
+              {getStatusLabel(aqiCategory)}
+            </div>
+            <div className="category-info">
+              Category (Waiting for first prediction...)
+            </div>
+          </>
+        )}
+        <div className="category-info-secondary">
+          Current Category: {getStatusLabel(aqiCategory)}
         </div>
       </div>
 
-      {probabilities && (
+      {prediction && prediction.probabilities && (
         <div className="probabilities">
           <h3>Prediction Probabilities</h3>
           <div className="probability-list">
-            {Object.entries(probabilities)
+            {Object.entries(prediction.probabilities)
               .sort(([, a], [, b]) => b - a)
               .map(([status, prob]) => (
                 <div key={status} className="probability-item">
@@ -227,11 +254,26 @@ export const AQIStatus = ({ prediction, onColorChange, currentColor }) => {
         </div>
       )}
 
-      {prediction.timestamp && (
-        <div className="timestamp">
-          Last updated: {new Date(prediction.timestamp).toLocaleString()}
-        </div>
-      )}
+      <div className="timestamp-info">
+        {aqiTimestamp && (
+          <div className="timestamp">
+            AQI Updated: {new Date(aqiTimestamp).toLocaleString()}
+          </div>
+        )}
+        {prediction && prediction.timestamp && (
+          <div className="timestamp prediction-timestamp">
+            Prediction Updated: {new Date(prediction.timestamp).toLocaleString()}
+            <span className="prediction-interval-badge">
+              (Every {predictionInterval} min)
+            </span>
+          </div>
+        )}
+        {!prediction && (
+          <div className="timestamp waiting-prediction">
+            ⏳ Waiting for first prediction (runs every {predictionInterval} minutes)
+          </div>
+        )}
+      </div>
 
       <ColorPickerSection />
     </div>

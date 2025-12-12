@@ -22,6 +22,20 @@ label_encoder_target = None
 latest_prediction = None
 prediction_history = deque(maxlen=100)  # Store last 100 predictions
 
+# Real-time AQI data (updated every second from MQTT)
+latest_aqi_value = None
+latest_aqi_timestamp = None
+aqi_data_history = deque(maxlen=100)  # Store last 100 AQI readings for real-time display
+
+# AQI values for averaging (used for predictions)
+aqi_values_for_averaging = deque(maxlen=30)  # Store last 30 AQI readings for averaging
+AVERAGING_WINDOW_SIZE = 30  # Number of recent readings to average for prediction
+
+# Prediction interval (15 minutes in seconds)
+PREDICTION_INTERVAL = 15 * 60  # 900 seconds
+prediction_timer = None
+prediction_lock = threading.Lock()  # Lock for thread-safe updates
+
 # MQTT Configuration
 MQTT_BROKER = "mqtteclipse.xetf.my.id"
 MQTT_PORT = 1883
@@ -334,7 +348,7 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     """Callback when MQTT message is received"""
-    global latest_prediction
+    global latest_aqi_value, latest_aqi_timestamp, aqi_data_history, aqi_values_for_averaging
     
     try:
         # Decode message
@@ -345,17 +359,25 @@ def on_message(client, userdata, msg):
         
         # Extract AQI value
         if 'AQI' in data:
-            aqi_value = data['AQI']
+            aqi_value = float(data['AQI'])
+            timestamp = datetime.now()
             
-            # Make prediction
-            prediction = predict_status(aqi_value)
+            # Store AQI value for real-time display (no prediction yet)
+            with prediction_lock:
+                latest_aqi_value = aqi_value
+                latest_aqi_timestamp = timestamp.isoformat()
+                
+                # Store in history for real-time display
+                aqi_data_history.append({
+                    "aqi": aqi_value,
+                    "timestamp": latest_aqi_timestamp
+                })
+                
+                # Store for averaging (only if value is valid, not 0 or negative)
+                if aqi_value > 0:
+                    aqi_values_for_averaging.append(aqi_value)
             
-            if "error" not in prediction:
-                latest_prediction = prediction
-                prediction_history.append(prediction)
-                print(f"✓ Prediction made: AQI={aqi_value}, Status={prediction['predicted_status']}")
-            else:
-                print(f"✗ Prediction error: {prediction['error']}")
+            print(f"✓ AQI value stored: {aqi_value} (Real-time data updated)")
         else:
             print("✗ No 'AQI' field in received data")
             
@@ -367,6 +389,71 @@ def on_message(client, userdata, msg):
 def on_disconnect(client, userdata, rc):
     """Callback when MQTT client disconnects"""
     print(f"Disconnected from MQTT broker. Return code: {rc}")
+
+def run_periodic_prediction():
+    """Run prediction every 15 minutes using averaged AQI values"""
+    global latest_prediction, latest_aqi_value, aqi_values_for_averaging, prediction_timer
+    
+    with prediction_lock:
+        # Calculate average of recent AQI values
+        if len(aqi_values_for_averaging) > 0:
+            avg_aqi = sum(aqi_values_for_averaging) / len(aqi_values_for_averaging)
+            num_readings = len(aqi_values_for_averaging)
+            
+            print(f"⏰ Running periodic prediction (every 15 minutes)...")
+            print(f"   Using averaged AQI: {avg_aqi:.2f} (from {num_readings} readings)")
+            print(f"   Individual values: {list(aqi_values_for_averaging)[-10:]}")  # Show last 10 for debugging
+            
+            # Make prediction using averaged value
+            prediction = predict_status(avg_aqi)
+            
+            if "error" not in prediction:
+                # Store both average and individual values in prediction result
+                prediction["aqi_averaged"] = avg_aqi
+                prediction["num_readings_used"] = num_readings
+                prediction["aqi_individual"] = list(aqi_values_for_averaging)[-10:]  # Store last 10 for reference
+                
+                latest_prediction = prediction
+                prediction_history.append(prediction)
+                print(f"✓ Periodic prediction made: Avg AQI={avg_aqi:.2f}, Status={prediction['predicted_status']}")
+            else:
+                print(f"✗ Periodic prediction error: {prediction['error']}")
+        elif latest_aqi_value is not None:
+            # Fallback: use latest single value if no averaging data available
+            print(f"⏰ Running periodic prediction (every 15 minutes)...")
+            print(f"   Warning: Using single AQI value (no averaging data): {latest_aqi_value}")
+            prediction = predict_status(latest_aqi_value)
+            
+            if "error" not in prediction:
+                latest_prediction = prediction
+                prediction_history.append(prediction)
+                print(f"✓ Periodic prediction made: AQI={latest_aqi_value}, Status={prediction['predicted_status']}")
+            else:
+                print(f"✗ Periodic prediction error: {prediction['error']}")
+        else:
+            print("⏰ Periodic prediction skipped: No AQI value available yet")
+    
+    # Schedule next prediction in 15 minutes
+    prediction_timer = threading.Timer(PREDICTION_INTERVAL, run_periodic_prediction)
+    prediction_timer.daemon = True
+    prediction_timer.start()
+
+def start_periodic_predictions():
+    """Start the periodic prediction timer"""
+    global prediction_timer
+    
+    print(f"⏰ Starting periodic predictions (every {PREDICTION_INTERVAL // 60} minutes)")
+    # Run first prediction attempt after a short delay to allow MQTT to connect
+    # Then schedule subsequent predictions every 15 minutes
+    def run_first_and_schedule():
+        import time
+        time.sleep(3)  # Wait 3 seconds for MQTT connection and first message
+        run_periodic_prediction()  # This will schedule the next one
+    
+    # Start first prediction attempt in a separate thread
+    first_thread = threading.Thread(target=run_first_and_schedule)
+    first_thread.daemon = True
+    first_thread.start()
 
 def start_mqtt_client():
     """Start MQTT client in a separate thread"""
@@ -437,13 +524,30 @@ def predict():
 
 @app.route('/latest', methods=['GET'])
 def get_latest():
-    """Get latest prediction from MQTT"""
-    global latest_prediction
+    """Get latest AQI value and prediction"""
+    global latest_prediction, latest_aqi_value, latest_aqi_timestamp
     
-    if latest_prediction is None:
-        return jsonify({"message": "No predictions received yet"}), 404
+    with prediction_lock:
+        response_data = {
+            "aqi": latest_aqi_value,
+            "aqi_timestamp": latest_aqi_timestamp,
+            "prediction": latest_prediction,
+            "prediction_interval_minutes": PREDICTION_INTERVAL // 60
+        }
+        
+        if latest_aqi_value is None:
+            return jsonify({
+                "message": "No AQI data received yet",
+                **response_data
+            }), 404
+        
+        if latest_prediction is None:
+            return jsonify({
+                "message": "AQI data available, waiting for first prediction",
+                **response_data
+            }), 200
     
-    return jsonify(latest_prediction), 200
+    return jsonify(response_data), 200
 
 @app.route('/history', methods=['GET'])
 def get_history():
@@ -455,6 +559,22 @@ def get_history():
     
     # Convert deque to list and limit
     history = list(prediction_history)[-limit:]
+    
+    return jsonify({
+        "count": len(history),
+        "history": history
+    }), 200
+
+@app.route('/aqi-history', methods=['GET'])
+def get_aqi_history():
+    """Get real-time AQI history (for display)"""
+    global aqi_data_history
+    
+    # Get limit from query parameter
+    limit = request.args.get('limit', default=100, type=int)
+    
+    # Convert deque to list and limit
+    history = list(aqi_data_history)[-limit:]
     
     return jsonify({
         "count": len(history),
@@ -500,6 +620,9 @@ if __name__ == '__main__':
     
     # Start MQTT client
     start_mqtt_client()
+    
+    # Start periodic predictions (every 15 minutes)
+    start_periodic_predictions()
     
     # Run Flask app
     print("\n" + "=" * 60)
